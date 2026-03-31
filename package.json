@@ -1,0 +1,29 @@
+{
+  "name": "india-re-monitor",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm --filter web dev",
+    "build": "pnpm --filter web build",
+    "start": "pnpm --filter web start",
+    "db:generate": "pnpm --filter @irem/db generate",
+    "db:migrate": "pnpm --filter @irem/db migrate",
+    "db:seed": "pnpm --filter @irem/db seed",
+    "db:studio": "pnpm --filter @irem/db studio",
+    "lint": "pnpm --filter web lint",
+    "format": "prettier --write ."
+  },
+  "devDependencies": {
+    "prettier": "^3.4.0",
+    "typescript": "^5.7.0"
+  },
+  "engines": {
+    "node": ">=22.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "sharp"
+    ]
+  }
+}

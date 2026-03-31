@@ -1,0 +1,49 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Environment
+.env
+.env.local
+.env.production
+
+# Build
+.next/
+out/
+dist/
+build/
+*.tsbuildinfo
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Database
+*.sql.bak
+pgdata/
+
+# Temporary
+tmp/
+temp/
+
+# PMTiles (large files)
+*.pmtiles
+
+# Python
+*.egg-info/
+.eggs/
+pip-log.txt
