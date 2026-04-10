@@ -19,6 +19,9 @@ export const metadata: Metadata = {
     'market data',
     'dashboard',
   ],
+};
+
+export const viewport = {
   themeColor: '#0a0e17',
 };
 

@@ -1,185 +1,222 @@
 import type { Metadata } from 'next';
+import { headers } from 'next/headers';
+import { timeAgo } from '@irem/shared';
 import { StatusBadge } from '@/components/ui/StatusBadge';
+import { DataProvenance } from '@/components/ui/DataProvenance';
 
 export const metadata: Metadata = {
   title: 'News',
+  description: 'AI-curated Indian real estate news from 30+ sources.',
 };
 
-const mockNews = [
-  {
-    id: '1',
-    title: 'RBI keeps repo rate unchanged at 6.5% — positive for housing demand',
-    source: 'Economic Times',
-    timeAgo: '2h ago',
-    category: 'policy',
-    sentiment: 'positive',
-    cities: ['National'],
-    summary:
-      'The Reserve Bank of India maintained the repo rate, keeping EMIs stable and supporting continued growth in housing demand across major cities.',
-  },
-  {
-    id: '2',
-    title: 'Mumbai records highest-ever stamp duty collections in March 2026',
-    source: 'LiveMint',
-    timeAgo: '4h ago',
-    category: 'market',
-    sentiment: 'positive',
-    cities: ['Mumbai'],
-    summary:
-      'Mumbai registered over 12,800 property transactions in March 2026, generating stamp duty revenue of over Rs 1,100 crore.',
-  },
-  {
-    id: '3',
-    title: 'Bengaluru sees 15% surge in premium housing demand in Q4',
-    source: 'Moneycontrol',
-    timeAgo: '6h ago',
-    category: 'market',
-    sentiment: 'positive',
-    cities: ['Bengaluru'],
-    summary:
-      'Luxury and premium segment (Rs 1.5 Cr+) sales in Bengaluru jumped 15% QoQ driven by tech corridor expansion and infrastructure improvements.',
-  },
-  {
-    id: '4',
-    title: 'MahaRERA cracks down on 45 projects for non-compliance',
-    source: 'Indian Express',
-    timeAgo: '8h ago',
-    category: 'legal',
-    sentiment: 'negative',
-    cities: ['Mumbai', 'Pune'],
-    summary:
-      'Maharashtra RERA issued show-cause notices to 45 projects for failing to submit quarterly progress reports and update project timelines.',
-  },
-  {
-    id: '5',
-    title: 'Delhi-Mumbai Expressway Phase 2 boosts real estate along the corridor',
-    source: 'ET Realty',
-    timeAgo: '12h ago',
-    category: 'project',
-    sentiment: 'positive',
-    cities: ['Delhi NCR', 'Mumbai'],
-    summary:
-      'Property prices along the Delhi-Mumbai Expressway corridor have appreciated 20-25% since the Phase 2 announcement.',
-  },
-  {
-    id: '6',
-    title: 'Hyderabad airport expansion to fuel Shamshabad micro-market growth',
-    source: 'Deccan Chronicle',
-    timeAgo: '1d ago',
-    category: 'project',
-    sentiment: 'positive',
-    cities: ['Hyderabad'],
-    summary:
-      'The planned second terminal at RGIA is expected to drive significant appreciation in the Shamshabad and surrounding micro-markets.',
-  },
-];
+export const dynamic = 'force-dynamic';
 
-const sentimentVariant: Record<string, 'success' | 'danger' | 'muted'> = {
-  positive: 'success',
-  negative: 'danger',
-  neutral: 'muted',
+interface NewsArticle {
+  id: string;
+  title: string;
+  url: string;
+  source: string;
+  publishedAt: string;
+  summary: string;
+  cities: string[];
+  developers: string[];
+  sentiment: number;
+  category: string;
+  isBreaking: boolean;
+}
+
+interface NewsResponse {
+  data: NewsArticle[];
+  meta: {
+    total: number;
+    categoryCounts: Record<string, number>;
+  };
+  updatedAt: string;
+}
+
+async function fetchNews(): Promise<NewsResponse> {
+  const h = await headers();
+  const host = h.get('host') ?? 'localhost:3000';
+  const protocol = host.startsWith('localhost') ? 'http' : 'https';
+  try {
+    const res = await fetch(`${protocol}://${host}/api/news`, { cache: 'no-store' });
+    if (!res.ok) throw new Error('fetch failed');
+    return res.json();
+  } catch {
+    return {
+      data: [],
+      meta: { total: 0, categoryCounts: {} },
+      updatedAt: new Date().toISOString(),
+    };
+  }
+}
+
+const CATEGORY_ICONS: Record<string, string> = {
+  market: 'M',
+  policy: 'P',
+  project: 'B',
+  legal: 'L',
+  infrastructure: 'I',
 };
 
-const categoryVariant: Record<string, 'info' | 'warning' | 'danger' | 'muted'> = {
-  policy: 'info',
-  market: 'success' as 'info',
-  project: 'warning' as 'info',
-  legal: 'danger',
+const CATEGORY_LABELS: Record<string, string> = {
+  market: 'Market',
+  policy: 'Policy',
+  project: 'Projects',
+  legal: 'Legal',
+  infrastructure: 'Infrastructure',
 };
 
-export default function NewsPage() {
+function sourceToProvenanceId(source: string): string {
+  const map: Record<string, string> = {
+    'ET Realty': 'et-realty',
+    Moneycontrol: 'moneycontrol-re',
+    LiveMint: 'livemint-housing',
+    'Business Standard': 'business-standard-re',
+    'The Hindu': 'hindu-re',
+  };
+  return map[source] ?? 'et-realty';
+}
+
+function sentimentBadge(sentiment: number) {
+  if (sentiment >= 0.3)
+    return <StatusBadge variant="success">Bullish</StatusBadge>;
+  if (sentiment <= -0.3)
+    return <StatusBadge variant="danger">Bearish</StatusBadge>;
+  return <StatusBadge variant="info">Neutral</StatusBadge>;
+}
+
+function NewsCard({ article }: { article: NewsArticle }) {
+  return (
+    <article className="group relative flex flex-col rounded-lg border border-border-primary bg-bg-secondary p-4 transition-colors hover:border-border-highlight">
+      {article.isBreaking && (
+        <div className="absolute -top-2 left-4">
+          <StatusBadge variant="danger">BREAKING</StatusBadge>
+        </div>
+      )}
+
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-bg-tertiary font-mono text-[10px] font-bold text-accent-cyan">
+            {CATEGORY_ICONS[article.category] ?? '?'}
+          </span>
+          <span className="font-mono text-[10px] uppercase tracking-wider text-accent-cyan">
+            {CATEGORY_LABELS[article.category] ?? article.category}
+          </span>
+        </div>
+        {sentimentBadge(article.sentiment)}
+      </div>
+
+      <h3 className="mb-2 text-sm font-semibold leading-snug text-text-primary group-hover:text-accent-blue">
+        <a href={article.url} target="_blank" rel="noopener noreferrer">
+          {article.title}
+        </a>
+      </h3>
+
+      <p className="mb-3 line-clamp-3 text-xs leading-relaxed text-text-secondary">
+        {article.summary}
+      </p>
+
+      {(article.cities.length > 0 || article.developers.length > 0) && (
+        <div className="mb-3 flex flex-wrap gap-1.5">
+          {article.cities.map((c) => (
+            <span
+              key={`c-${c}`}
+              className="rounded-full border border-accent-blue/30 bg-accent-blue/10 px-2 py-0.5 text-[10px] text-accent-blue"
+            >
+              {c}
+            </span>
+          ))}
+          {article.developers.map((d) => (
+            <span
+              key={`d-${d}`}
+              className="rounded-full border border-accent-purple/30 bg-accent-purple/10 px-2 py-0.5 text-[10px] text-accent-purple"
+            >
+              {d}
+            </span>
+          ))}
+        </div>
+      )}
+
+      <div className="mt-auto flex items-center justify-between border-t border-border-primary pt-2">
+        <DataProvenance
+          sourceId={sourceToProvenanceId(article.source)}
+          lastUpdated={article.publishedAt}
+          compact
+        />
+        <span className="font-mono text-[10px] text-text-muted">
+          {timeAgo(new Date(article.publishedAt))}
+        </span>
+      </div>
+    </article>
+  );
+}
+
+export default async function NewsPage() {
+  const response = await fetchNews();
+  const articles = response.data;
+  const breaking = articles.filter((a) => a.isBreaking);
+  const regular = articles.filter((a) => !a.isBreaking);
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="font-mono text-lg font-bold text-text-primary">News</h1>
-        <p className="text-sm text-text-secondary">
-          AI-curated real estate news from 100+ Indian sources
-        </p>
-      </div>
-
-      {/* AI Daily Brief */}
-      <div className="rounded-lg border border-accent-purple/20 bg-bg-secondary p-4">
-        <div className="mb-2 flex items-center gap-2">
-          <svg
-            className="h-4 w-4 text-accent-purple"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={2}
-          >
-            <path d="M12 2a4 4 0 0 1 4 4c0 1.95-1.4 3.58-3.25 3.93L12 22" />
-            <path d="M12 2a4 4 0 0 0-4 4c0 1.95 1.4 3.58 3.25 3.93" />
-          </svg>
-          <h2 className="font-mono text-sm font-semibold text-accent-purple">
-            AI Morning Brief — March 30, 2026
-          </h2>
+      {/* Header */}
+      <div className="flex items-end justify-between">
+        <div>
+          <h1 className="font-mono text-lg font-bold text-text-primary">News</h1>
+          <p className="text-sm text-text-secondary">
+            AI-curated real estate news from 30+ sources · {articles.length} articles
+          </p>
         </div>
-        <p className="text-sm leading-relaxed text-text-secondary">
-          Markets remain buoyant as RBI holds rates steady. Mumbai stamp duty collections
-          hit all-time highs, while Bengaluru&apos;s premium segment continues its upward
-          trajectory. Regulatory action by MahaRERA signals increasing compliance enforcement.
-          Infrastructure projects, particularly the Delhi-Mumbai Expressway, are creating new
-          investment corridors with 20-25% appreciation.
-        </p>
+        <div className="hidden items-center gap-2 sm:flex">
+          <span className="flex h-2 w-2 rounded-full bg-accent-green animate-pulse" />
+          <span className="font-mono text-xs text-text-secondary">LIVE</span>
+        </div>
       </div>
 
-      {/* Filters */}
+      {/* Category filters */}
       <div className="flex flex-wrap gap-2">
-        {['All', 'Policy', 'Market', 'Project', 'Legal'].map((filter) => (
-          <button
-            key={filter}
-            className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
-              filter === 'All'
-                ? 'border-accent-blue bg-accent-blue/10 text-accent-blue'
-                : 'border-border-primary text-text-secondary hover:border-border-highlight hover:text-text-primary'
-            }`}
+        {Object.entries(response.meta.categoryCounts).map(([cat, count]) => (
+          <div
+            key={cat}
+            className="flex items-center gap-2 rounded-full border border-border-primary bg-bg-secondary px-3 py-1.5 text-xs font-medium text-text-secondary"
           >
-            {filter}
-          </button>
+            <span className="flex h-4 w-4 items-center justify-center rounded-full bg-bg-tertiary font-mono text-[9px] font-bold text-accent-cyan">
+              {CATEGORY_ICONS[cat]}
+            </span>
+            <span>{CATEGORY_LABELS[cat] ?? cat}</span>
+            <span className="rounded-full bg-bg-tertiary px-1.5 font-mono text-[10px] text-text-muted">
+              {count}
+            </span>
+          </div>
         ))}
       </div>
 
-      {/* News cards */}
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {mockNews.map((article) => (
-          <article
-            key={article.id}
-            className="group cursor-pointer rounded-lg border border-border-primary bg-bg-secondary p-4 transition-all hover:border-border-highlight"
-          >
-            <div className="flex items-start justify-between gap-2">
-              <h3 className="text-sm font-medium leading-snug text-text-primary group-hover:text-accent-blue">
-                {article.title}
-              </h3>
-            </div>
+      {/* Breaking news */}
+      {breaking.length > 0 && (
+        <section className="space-y-3">
+          <h2 className="font-mono text-xs font-bold uppercase tracking-wider text-accent-red">
+            Breaking
+          </h2>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            {breaking.map((article) => (
+              <NewsCard key={article.id} article={article} />
+            ))}
+          </div>
+        </section>
+      )}
 
-            <p className="mt-2 text-xs leading-relaxed text-text-secondary line-clamp-2">
-              {article.summary}
-            </p>
-
-            <div className="mt-3 flex flex-wrap items-center gap-2">
-              <StatusBadge variant={sentimentVariant[article.sentiment]}>
-                {article.sentiment}
-              </StatusBadge>
-              <StatusBadge variant={categoryVariant[article.category] || 'muted'}>
-                {article.category}
-              </StatusBadge>
-              {article.cities.map((city) => (
-                <span
-                  key={city}
-                  className="rounded bg-bg-tertiary px-1.5 py-0.5 text-xs text-text-muted"
-                >
-                  {city}
-                </span>
-              ))}
-            </div>
-
-            <div className="mt-3 flex items-center justify-between text-xs text-text-muted">
-              <span>{article.source}</span>
-              <span>{article.timeAgo}</span>
-            </div>
-          </article>
-        ))}
-      </div>
+      {/* Latest news */}
+      <section className="space-y-3">
+        <h2 className="font-mono text-xs font-bold uppercase tracking-wider text-text-secondary">
+          Latest
+        </h2>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {regular.map((article) => (
+            <NewsCard key={article.id} article={article} />
+          ))}
+        </div>
+      </section>
     </div>
   );
 }

@@ -9,21 +9,24 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@irem/shared": "workspace:*",
+    "@tanstack/react-query": "^5.62.0",
+    "clsx": "^2.1.0",
+    "d3-scale": "^4.0.2",
     "next": "^15.2.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "zustand": "^5.0.0",
-    "@tanstack/react-query": "^5.62.0",
-    "@irem/shared": "workspace:*",
-    "clsx": "^2.1.0"
+    "recharts": "^3.8.1",
+    "zustand": "^5.0.0"
   },
   "devDependencies": {
+    "@tailwindcss/postcss": "^4.0.0",
+    "@types/d3-scale": "^4.0.9",
     "@types/node": "^22.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
-    "typescript": "^5.7.0",
+    "postcss": "^8.5.0",
     "tailwindcss": "^4.0.0",
-    "@tailwindcss/postcss": "^4.0.0",
-    "postcss": "^8.5.0"
+    "typescript": "^5.7.0"
   }
 }

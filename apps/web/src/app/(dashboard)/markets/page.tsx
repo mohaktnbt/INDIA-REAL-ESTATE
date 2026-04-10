@@ -1,180 +1,227 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
+import { headers } from 'next/headers';
+import { formatPricePerSqFt, formatIndianNumber, formatChangePercent } from '@irem/shared';
 import { StatusBadge } from '@/components/ui/StatusBadge';
+import { DataProvenance } from '@/components/ui/DataProvenance';
+import { CityComparisonChart } from '@/components/charts';
+import { mockCityComparisonData } from '@/lib/mock-data';
 
 export const metadata: Metadata = {
   title: 'Markets',
+  description: 'City-level market data with health indices and trends.',
 };
 
-const cities = [
-  {
-    name: 'Mumbai',
-    state: 'Maharashtra',
-    tier: 1,
-    avgPrice: '\u20B924,500/sq ft',
-    yoyChange: '+5.1%',
-    direction: 'up' as const,
-    activeListings: '12,450',
-    reraProjects: 4820,
-    healthIndex: 78,
-  },
-  {
-    name: 'Bengaluru',
-    state: 'Karnataka',
-    tier: 1,
-    avgPrice: '\u20B99,200/sq ft',
-    yoyChange: '+8.2%',
-    direction: 'up' as const,
-    activeListings: '9,870',
-    reraProjects: 3240,
-    healthIndex: 85,
-  },
-  {
-    name: 'Hyderabad',
-    state: 'Telangana',
-    tier: 1,
-    avgPrice: '\u20B98,750/sq ft',
-    yoyChange: '+7.5%',
-    direction: 'up' as const,
-    activeListings: '7,630',
-    reraProjects: 2180,
-    healthIndex: 82,
-  },
-  {
-    name: 'Pune',
-    state: 'Maharashtra',
-    tier: 1,
-    avgPrice: '\u20B98,100/sq ft',
-    yoyChange: '+6.8%',
-    direction: 'up' as const,
-    activeListings: '8,240',
-    reraProjects: 3560,
-    healthIndex: 80,
-  },
-  {
-    name: 'Delhi NCR',
-    state: 'Delhi/Haryana/UP',
-    tier: 1,
-    avgPrice: '\u20B912,800/sq ft',
-    yoyChange: '+4.2%',
-    direction: 'up' as const,
-    activeListings: '15,320',
-    reraProjects: 5670,
-    healthIndex: 72,
-  },
-  {
-    name: 'Chennai',
-    state: 'Tamil Nadu',
-    tier: 1,
-    avgPrice: '\u20B97,600/sq ft',
-    yoyChange: '+4.9%',
-    direction: 'up' as const,
-    activeListings: '6,180',
-    reraProjects: 2450,
-    healthIndex: 76,
-  },
-  {
-    name: 'Ahmedabad',
-    state: 'Gujarat',
-    tier: 2,
-    avgPrice: '\u20B95,800/sq ft',
-    yoyChange: '+3.8%',
-    direction: 'up' as const,
-    activeListings: '4,560',
-    reraProjects: 1890,
-    healthIndex: 74,
-  },
-  {
-    name: 'Kolkata',
-    state: 'West Bengal',
-    tier: 1,
-    avgPrice: '\u20B95,200/sq ft',
-    yoyChange: '-1.2%',
-    direction: 'down' as const,
-    activeListings: '3,780',
-    reraProjects: 1240,
-    healthIndex: 58,
-  },
-];
+export const dynamic = 'force-dynamic';
 
-function getTierBadge(tier: number) {
-  if (tier === 1) return <StatusBadge variant="info">Tier {tier}</StatusBadge>;
-  if (tier === 2) return <StatusBadge variant="success">Tier {tier}</StatusBadge>;
-  return <StatusBadge variant="muted">Tier {tier}</StatusBadge>;
+interface MarketRow {
+  city: string;
+  state: string;
+  tier: number;
+  population: number;
+  healthIndex: number;
+  medianPricePerSqFt: number;
+  priceChangeYoY: number;
+  activeListings: number;
+  reraProjects: number;
+  avgRentalYield: number;
+  metroConnectivity: boolean;
 }
 
-function getHealthColor(score: number): string {
-  if (score >= 80) return 'text-accent-green';
-  if (score >= 60) return 'text-accent-blue';
-  if (score >= 40) return 'text-accent-amber';
+interface MarketsResponse {
+  data: MarketRow[];
+}
+
+async function fetchMarkets(): Promise<MarketsResponse> {
+  const h = await headers();
+  const host = h.get('host') ?? 'localhost:3000';
+  const protocol = host.startsWith('localhost') ? 'http' : 'https';
+  try {
+    const res = await fetch(`${protocol}://${host}/api/markets`, { cache: 'no-store' });
+    if (!res.ok) throw new Error('fetch failed');
+    return res.json();
+  } catch {
+    return { data: [] };
+  }
+}
+
+function healthColor(score: number): string {
+  if (score >= 85) return 'text-accent-green';
+  if (score >= 70) return 'text-accent-cyan';
+  if (score >= 55) return 'text-accent-amber';
   return 'text-accent-red';
 }
 
-export default function MarketsPage() {
+function healthBarColor(score: number): string {
+  if (score >= 85) return 'bg-accent-green';
+  if (score >= 70) return 'bg-accent-cyan';
+  if (score >= 55) return 'bg-accent-amber';
+  return 'bg-accent-red';
+}
+
+function CityCard({ market }: { market: MarketRow }) {
+  const isPositive = market.priceChangeYoY >= 0;
+  return (
+    <Link
+      href={`/markets/${market.city.toLowerCase()}`}
+      className="group flex flex-col rounded-lg border border-border-primary bg-bg-secondary p-4 transition-colors hover:border-border-highlight"
+    >
+      <div className="mb-3 flex items-start justify-between">
+        <div>
+          <h3 className="font-mono text-base font-bold text-text-primary group-hover:text-accent-blue">
+            {market.city}
+          </h3>
+          <div className="mt-0.5 flex items-center gap-2">
+            <span className="text-xs text-text-secondary">{market.state}</span>
+            <StatusBadge variant={market.tier === 1 ? 'info' : 'muted'}>
+              Tier {market.tier}
+            </StatusBadge>
+          </div>
+        </div>
+        <div className="text-right">
+          <div className="font-mono text-[10px] uppercase tracking-wider text-text-muted">
+            Health
+          </div>
+          <div className={`font-mono text-xl font-bold ${healthColor(market.healthIndex)}`}>
+            {market.healthIndex}
+          </div>
+        </div>
+      </div>
+
+      {/* Health bar */}
+      <div className="mb-3 h-1 w-full overflow-hidden rounded-full bg-bg-tertiary">
+        <div
+          className={`h-full ${healthBarColor(market.healthIndex)} transition-all`}
+          style={{ width: `${market.healthIndex}%` }}
+        />
+      </div>
+
+      <div className="mb-3">
+        <div className="font-mono text-2xl font-bold tabular-nums text-text-primary">
+          {formatPricePerSqFt(market.medianPricePerSqFt)}
+        </div>
+        <div
+          className={`flex items-center gap-1 font-mono text-xs tabular-nums ${
+            isPositive ? 'text-accent-green' : 'text-accent-red'
+          }`}
+        >
+          <svg className="h-3 w-3" viewBox="0 0 12 12" fill="currentColor">
+            <path d={isPositive ? 'M6 2l4 5H2l4-5z' : 'M6 10l4-5H2l4 5z'} />
+          </svg>
+          {formatChangePercent(market.priceChangeYoY)} YoY
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-y-1.5 border-t border-border-primary pt-3 text-[11px]">
+        <div className="text-text-muted">Listings</div>
+        <div className="text-right font-mono text-text-secondary">
+          {formatIndianNumber(market.activeListings)}
+        </div>
+        <div className="text-text-muted">RERA Projects</div>
+        <div className="text-right font-mono text-text-secondary">
+          {formatIndianNumber(market.reraProjects)}
+        </div>
+        <div className="text-text-muted">Rental Yield</div>
+        <div className="text-right font-mono text-text-secondary">
+          {market.avgRentalYield.toFixed(1)}%
+        </div>
+        <div className="text-text-muted">Metro</div>
+        <div className="text-right font-mono text-text-secondary">
+          {market.metroConnectivity ? 'Yes' : 'No'}
+        </div>
+      </div>
+    </Link>
+  );
+}
+
+export default async function MarketsPage() {
+  const response = await fetchMarkets();
+  const markets = response.data;
+
+  const totalListings = markets.reduce((a, m) => a + (m.activeListings ?? 0), 0);
+  const totalRera = markets.reduce((a, m) => a + (m.reraProjects ?? 0), 0);
+  const avgHealth =
+    markets.length > 0
+      ? Math.round(markets.reduce((a, m) => a + m.healthIndex, 0) / markets.length)
+      : 0;
+
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div>
         <h1 className="font-mono text-lg font-bold text-text-primary">Markets</h1>
         <p className="text-sm text-text-secondary">
-          City-level market data across India &mdash; click a city to drill down
+          City-level market intelligence · {markets.length} cities tracked
         </p>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-        {cities.map((city) => (
-          <div
-            key={city.name}
-            className="group cursor-pointer rounded-lg border border-border-primary bg-bg-secondary p-4 transition-all hover:border-border-highlight hover:shadow-lg"
-          >
-            <div className="flex items-start justify-between">
-              <div>
-                <h3 className="font-medium text-text-primary group-hover:text-accent-blue">
-                  {city.name}
-                </h3>
-                <p className="text-xs text-text-muted">{city.state}</p>
-              </div>
-              {getTierBadge(city.tier)}
-            </div>
-
-            <div className="mt-4 space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-text-secondary">Avg Price</span>
-                <span className="font-mono text-sm tabular-nums text-text-primary">
-                  {city.avgPrice}
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-text-secondary">YoY Change</span>
-                <span
-                  className={`font-mono text-sm tabular-nums ${
-                    city.direction === 'up' ? 'text-accent-green' : 'text-accent-red'
-                  }`}
-                >
-                  {city.yoyChange}
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-text-secondary">Listings</span>
-                <span className="font-mono text-sm tabular-nums text-text-primary">
-                  {city.activeListings}
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-text-secondary">RERA Projects</span>
-                <span className="font-mono text-sm tabular-nums text-text-primary">
-                  {city.reraProjects.toLocaleString('en-IN')}
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-text-secondary">Health Index</span>
-                <span
-                  className={`font-mono text-sm font-semibold tabular-nums ${getHealthColor(city.healthIndex)}`}
-                >
-                  {city.healthIndex}/100
-                </span>
-              </div>
-            </div>
+      {/* Summary stats */}
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+        <div className="rounded-lg border border-border-primary bg-bg-secondary p-4">
+          <div className="text-xs font-medium uppercase tracking-wider text-text-secondary">
+            Cities
           </div>
-        ))}
+          <div className="mt-2 font-mono text-2xl font-bold text-accent-blue">
+            {markets.length}
+          </div>
+        </div>
+        <div className="rounded-lg border border-border-primary bg-bg-secondary p-4">
+          <div className="text-xs font-medium uppercase tracking-wider text-text-secondary">
+            Active Listings
+          </div>
+          <div className="mt-2 font-mono text-2xl font-bold text-accent-cyan">
+            {formatIndianNumber(totalListings)}
+          </div>
+        </div>
+        <div className="rounded-lg border border-border-primary bg-bg-secondary p-4">
+          <div className="text-xs font-medium uppercase tracking-wider text-text-secondary">
+            RERA Projects
+          </div>
+          <div className="mt-2 font-mono text-2xl font-bold text-accent-amber">
+            {formatIndianNumber(totalRera)}
+          </div>
+        </div>
+        <div className="rounded-lg border border-border-primary bg-bg-secondary p-4">
+          <div className="text-xs font-medium uppercase tracking-wider text-text-secondary">
+            Avg Health
+          </div>
+          <div className={`mt-2 font-mono text-2xl font-bold ${healthColor(avgHealth)}`}>
+            {avgHealth}
+          </div>
+        </div>
+      </div>
+
+      {/* Comparison chart */}
+      <div className="rounded-lg border border-border-primary bg-bg-surface p-4">
+        <div className="mb-3 flex items-center justify-between">
+          <div>
+            <h2 className="font-mono text-sm font-semibold text-text-primary">
+              Top 15 Cities — YoY Price Change
+            </h2>
+            <p className="text-xs text-text-muted">Ranked by price growth · Indian Rupee per sq ft</p>
+          </div>
+          <DataProvenance sourceId="nhb-residex" compact />
+        </div>
+        <CityComparisonChart
+          data={mockCityComparisonData}
+          metric="YoY %"
+          height={340}
+        />
+      </div>
+
+      {/* City cards grid */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="font-mono text-xs font-bold uppercase tracking-wider text-text-secondary">
+            City Cards
+          </h2>
+          <DataProvenance sourceId="acres-99" compact />
+        </div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {markets.map((market) => (
+            <CityCard key={market.city} market={market} />
+          ))}
+        </div>
       </div>
     </div>
   );
